@@ -2,6 +2,23 @@ package org.jinghe.com;
 
 import static org.junit.Assert.assertTrue;
 
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.io.RandomAccessFile;
+import org.apache.pdfbox.multipdf.Splitter;
+import org.apache.pdfbox.pdfparser.PDFParser;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.PDFTextStripperByArea;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.jinghe.com.pojo.PunishObj;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -10,8 +27,18 @@ import org.jsoup.safety.Whitelist;
 import org.jsoup.select.Elements;
 import org.junit.Test;
 
+import javax.imageio.ImageIO;
+//import java.awt.*;
+import java.awt.geom.Rectangle2D;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,8 +60,9 @@ public class AppTest
 //    正则表达式测试
     @Test
     public void regularTest(){
-        String str = "我是罚款壹万元我是hade你爹";
-        String regex = "(?<=罚款).+?(?=元)";
+        String str = "上的das号  所测试领受到惩罚手段：2034年12月5日";
+//        String regex = "(?<=罚款).+?(?=元)";
+        String regex = "^.*?(?=号)";
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(str);
         if (matcher.find()) {
@@ -50,6 +78,19 @@ public class AppTest
             System.out.println("匹配成功：" + matcher.group());
         } else {
             System.out.println("匹配失败");
+        }
+    }
+
+    @Test
+    public void resolveStringTest(){
+        String str = "nihaohttp://www.gaotang.gov.cn/gtxxgk/szfbmxxgk/gtxhjbhj/202303/t20230315_4264748.htmlhfsrfrghhttp://www.guanxian.gov.cn/gxxxgk/xzfbmxxgk/gxhjbhfj/202304/t20230427_4302753.htmlhtmlheihei";
+        String regex = "http[^\\s]+?\\.html";
+        Pattern pattern;
+        Matcher matcher;
+        pattern = Pattern.compile(regex);
+        matcher = pattern.matcher(str);
+        while (matcher.find()){
+            System.out.println(matcher.group());
         }
     }
 
@@ -146,5 +187,114 @@ public class AppTest
     @Test
     public void pdfdownLoadTest(){
 
+    }
+
+//    解析pdf测试
+    @Test
+    public void resolvePdfTest() throws IOException {
+
+        String fileName = "D:\\hhh.pdf";
+        PDDocument document = PDDocument.load(new File(fileName));
+        PDFTextStripper stripper = new PDFTextStripper();
+
+        String content = stripper.getText(document);
+        System.out.println(content);
+        document.close();
+
+    }
+
+//    解析docx测试
+    @Test
+    public  void readDocx() {
+        String filePath = "D:\\JavaTest\\reptile\\src\\main\\resources\\山东省\\聊城市\\P020230428348400607067.docx";
+        StringBuilder result = new StringBuilder();
+
+        try (FileInputStream fis = new FileInputStream(new File(filePath))) {
+            XWPFDocument document = new XWPFDocument(fis);
+            XWPFWordExtractor extractor = new XWPFWordExtractor(document);
+            result.append(extractor.getText());
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println(result.toString());
+    }
+
+
+//    java解析docces
+    @Test
+    public void readDoc() {
+        String filePath = "D:\\JavaTest\\reptile\\src\\main\\resources\\山东省\\聊城市\\P020230428348400501221.doc";
+        StringBuilder result = new StringBuilder();
+
+        try (FileInputStream fis = new FileInputStream(new File(filePath))) {
+            HWPFDocument document = new HWPFDocument(fis);
+            WordExtractor extractor = new WordExtractor(document);
+            result.append(extractor.getText());
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println(result.toString());
+    }
+
+//    java解析xls格式文件
+    @Test
+    public void resolveXls(){
+        String filePath = "D:\\JavaTest\\reptile\\src\\main\\resources\\山东省\\聊城市\\P020221011336622159119.xls";
+//        StringBuilder result = new StringBuilder();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+        try (FileInputStream fis = new FileInputStream(new File(filePath))) {
+            HSSFWorkbook workbook = new HSSFWorkbook(fis);
+            Sheet sheet = workbook.getSheetAt(0);
+            // 获取日期时间格式
+            DataFormat dataFormat = workbook.createDataFormat();
+            short dateTimeFormat = dataFormat.getFormat("yyyy-mm-dd hh:mm:ss");
+            CellStyle dateTimeStyle = workbook.createCellStyle();
+            dateTimeStyle.setDataFormat(dateTimeFormat);
+
+            // 获取日期格式
+            short dateFormat = dataFormat.getFormat("yyyy-mm-dd");
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(dateFormat);
+            for (int i = 0; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+                for (int j = 0; j < row.getLastCellNum(); j++) {
+                    Cell cell = row.getCell(j);
+                    if (cell == null) break;
+                    if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)){
+                        // 处理日期
+                        Date date = sdf.parse(row.getCell(i).toString());
+                        row.getCell(i).setCellValue(date);
+                        row.getCell(i).setCellStyle(dateStyle);
+                        System.out.println(date.toString());
+                    } if (cell.getCellType() == CellType.NUMERIC) {
+                        System.out.println(cell.getNumericCellValue());
+//                        result.append(cell.getNumericCellValue());
+                    } else if (cell.getCellType() == CellType.STRING) {
+                        System.out.println(cell.getStringCellValue());
+//                        result.append(cell.getStringCellValue());
+                    } else if (cell.getCellType() == CellType.BOOLEAN) {
+                        System.out.println(cell.getBooleanCellValue());
+//                        result.append(cell.getBooleanCellValue());
+                    }
+                }
+                System.out.println();
+            }
+            workbook.close();
+        }
+        catch (IOException | ParseException e) {
+            e.printStackTrace();
+        }
+    }
+
+//    Java解析xlsx格式文件
+    @Test
+    public void resolveXlsx(){
+
+//        System.out.println(result.toString());
     }
 }

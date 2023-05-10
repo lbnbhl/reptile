@@ -8,6 +8,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.jinghe.com.core.Crawler;
 import org.jinghe.com.pojo.PunishObj;
 import org.jinghe.com.util.DownLoadUtil;
 import org.jinghe.com.util.ExcelUtil;
@@ -57,22 +58,31 @@ public class CrawlerMain {
 
 
     public static void main(String[] args) {
+        Crawler crawler = new Crawler();
+
+        String a = "http://sthjj.liaocheng.gov.cn/xxgk/wryhjjgxxgk/xzcf/index.html";
+        crawler.crawling(a);
+        String b = "http://sthjj.liaocheng.gov.cn/xxgk/wryhjjgxxgk/xzcf/index_";
+        for (int i = 1; i < 31; i++) {
+            crawler.crawling(b+i+".html");
+        }
 //        加载资源
 //        loadResources(url...);
 //        //处理资源
 //        resolveResources();
 //        //得到结果
 //        getResult();
-        System.setProperty("javax.net.ssl.keyStore", "D:/Secure/Program_Base/jdk/jre/lib/security/mykeystore");
-        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
-        CrawlerMain crawlerMain = new CrawlerMain();
+//        System.setProperty("javax.net.ssl.keyStore", "D:/Secure/Program_Base/jdk/jre/lib/security/mykeystore");
+//        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
+//        CrawlerMain crawlerMain = new CrawlerMain();
+////        crawlerMain.setPublishUrl();
 //        crawlerMain.setPublishUrl();
-        crawlerMain.setPublishUrl();
-        crawlerMain.excuteUrl();
-        for (String value : crawlerMain.fileMap.values()) {
-            DownLoadUtil.downloadFile(value,"/");
-        }
-        ExcelUtil.getExcel(crawlerMain.punishObjList, "/hhhhh.xls");
+//        crawlerMain.excuteUrl();
+//        Set<String> fileNames = crawlerMain.fileMap.keySet();
+//        for (String fileName : fileNames) {
+//            DownLoadUtil.downloadFile(crawlerMain.fileMap.get(fileName),"./src/main/resources/山东省/聊城市/");
+//        }
+//        ExcelUtil.getExcel(crawlerMain.punishObjList, "/hhhhh.xls");
     }
 
 //    爬取黑龙江大庆市的处罚结果 TODO 先看逻辑，再封装方法
@@ -212,7 +222,7 @@ public class CrawlerMain {
                     //TODO 后面必须要对链接用正则做，看有无pdf，doc这些可下载的文件 TODO 也可通过其他方法区别
                     if (linkHref.contains(".pdf") || linkHref.contains(".doc") || linkHref.contains(".docx") || linkHref.contains(".xls") || linkHref.contains(".xlsx") || linkHref.contains(".pptx")){
                         flag = true;
-                        fileMap.put(linkText,linkHref);
+                        fileMap.put(DownLoadUtil.getFileNameFromUrl(linkHref),linkHref);
                     }
                 }
 //                没有可下载资源说明内容再html上，TODO 这是以html和可下载资源只能存在一个为基础的
@@ -335,5 +345,17 @@ public class CrawlerMain {
     //    解析doc文件
     public void resolveXlsx(){
 
+    }
+
+//    处理字符串类型
+    public void resolveString(String str){
+        String regex = "http[^\\s]+?\\.html";
+        Pattern pattern;
+        Matcher matcher;
+        pattern = Pattern.compile(regex);
+        matcher = pattern.matcher(str);
+        while (matcher.find()){
+            System.out.println(matcher.group());
+        }
     }
 }
