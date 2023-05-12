@@ -61,7 +61,7 @@ public class ExcelUtil {
                 row = sheet.createRow(rowNumber++);
                 row.createCell(0).setCellValue(punishObj.getProvince());
                 row.createCell(1).setCellValue(punishObj.getCity());
-                row.createCell(2).setCellValue(punishObj.getDate().toString());
+                row.createCell(2).setCellValue(punishObj.getDate());
                 row.createCell(3).setCellValue(punishObj.getTarget());
                 row.createCell(4).setCellValue(punishObj.getReason());
                 row.createCell(5).setCellValue(punishObj.getContent());

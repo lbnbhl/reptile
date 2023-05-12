@@ -19,7 +19,7 @@ public class PunishObj {
     private String city;
 
 //    披露日期
-    private LocalDate date;
+    private String date;
 
 //    处罚对象
     private String target;

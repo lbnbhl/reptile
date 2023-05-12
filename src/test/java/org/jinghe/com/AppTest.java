@@ -79,6 +79,28 @@ public class AppTest
         } else {
             System.out.println("匹配失败");
         }
+
+//        获取最后一个/前面所有内容的正则表达式怎么写
+        regex = "^.*/([^/]+)$";
+        str = "http://sthjj.liaocheng.gov.cn/xxgk/wryhjjgxxgk/xzcf/index_18.html";
+        pattern = Pattern.compile(regex);
+        matcher = pattern.matcher(str);
+        if (matcher.find()) {
+            System.out.println("匹配成功：" + matcher.group());
+        } else {
+            System.out.println("匹配失败");
+        }
+
+        String inputString = "path/to/my/file.txt";
+        String patternString = "^(.*)/[^/]+$";
+
+        pattern = Pattern.compile(patternString);
+        matcher = pattern.matcher(inputString);
+
+        if (matcher.find()) {
+            String result = matcher.group(1);
+            System.out.println(result); // 输出：path/to/my
+        }
     }
 
     @Test
@@ -116,7 +138,7 @@ public class AppTest
             String name = element.attr("name");
             String content = element.attr("content");;
             if (name.equals("PubDate")){
-                punishObj.setDate(LocalDate.parse(content));
+                punishObj.setDate(content);
             }if (name.equals("ArticleTitle")){
                 punishObj.setTitle(content);
             }else if (name.equals("SiteName")){
@@ -296,5 +318,18 @@ public class AppTest
     public void resolveXlsx(){
 
 //        System.out.println(result.toString());
+    }
+
+    @Test
+    public void exceptionTest(){
+        try {
+            System.out.println(1/0);
+        }catch (Exception e){
+            System.out.println("出现异常啦");
+            e.printStackTrace();
+        }
+
+        System.out.println("heihei");
+
     }
 }

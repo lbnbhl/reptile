@@ -4,10 +4,14 @@ import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.jinghe.com.pojo.PunishObj;
 import org.jinghe.com.resources.Resource;
 import org.jinghe.com.util.DownLoadUtil;
 import org.jinghe.com.util.ExcelUtil;
+import org.jinghe.com.work.RunApplication;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -43,16 +47,16 @@ public class Crawler {
     private ThreadPoolExecutor threadPoolExecutor;
 
     //    数据结果集合
-    private List<PunishObj> punishObjList;
+    private List punishObjList;
 
-    private final String saveDir = "./src/main/resources/";
+    private final String saveDir = "D:\\JavaTest\\reptile\\src\\main\\resources\\";
 
     public Crawler() {
         this.fileMap = new HashMap<>();
         this.urlQueue = new ArrayDeque<>();
         this.punishQueue = new ArrayDeque<>();
         this.threadPoolExecutor = new ThreadPoolExecutor(5,10,3, TimeUnit.SECONDS,new LinkedBlockingQueue<>());
-        this.punishObjList = new ArrayList<>();
+        this.punishObjList = RunApplication.punishObjList;
     }
 
 
@@ -66,14 +70,20 @@ public class Crawler {
 
     public void crawling(String url){
         putUrlToQueue(url);
-        threadPoolExecutor.execute(()->{
-            try {
-                resolveUrl(url);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            removeUrlFromQueue();
-        });
+        try {
+            resolveUrl(url);
+        } catch (InterruptedException e) {
+//            e.printStackTrace();
+        }
+        removeUrlFromQueue();
+//        threadPoolExecutor.execute(()->{
+//            try {
+//                resolveUrl(url);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//            removeUrlFromQueue();
+//        });
 //        loadUrl();
     }
 
@@ -103,26 +113,28 @@ public class Crawler {
         if (isDownloadable(url)) {
             if (!isLocalUrl(url)){
                 fileMap.put(url,url);
-                threadPoolExecutor.execute(()->{
-                    DownLoadUtil.downloadFile(url,saveDir);
-                    fileMap.remove(url);
-                });
+//                TODO 下载是需要时间的
+                DownLoadUtil.downloadFile(url,saveDir);
+                fileMap.remove(url);
+//                threadPoolExecutor.execute(()->{
+//                    DownLoadUtil.downloadFile(url,saveDir);
+//                    fileMap.remove(url);
+//                });
             }
             String fileName =saveDir + DownLoadUtil.getFileNameFromUrl(url);
             str = transferToString(fileName);
             flag = true;
+
             deleteFile(fileName);
         }
         if (!getUrlsAndResolve(str,flag)){
             putPojoToList(str,flag);
-            //TODO 怎么确保其他的操作都执行完了
-            ExcelUtil.getExcel(punishObjList, saveDir+"heihei.xls");
         }
     }
 
 //    解析文档，封装成pojo，放入list中
     private void putPojoToList(String str, Boolean flag) {
-        if (flag){
+        if (!flag){
 //            根据html解析pojo
             createPojoAndPutListForHtml(str);
         }else {
@@ -151,7 +163,7 @@ public class Crawler {
         pattern = Pattern.compile(regex);
         matcher = pattern.matcher(str);
         if (matcher.find()){
-            punishObj.setDate(LocalDate.parse(matcher.group()));
+            punishObj.setDate(matcher.group());
         }
 
 //        处理机构
@@ -237,12 +249,21 @@ public class Crawler {
                 Matcher matcher = pattern.matcher(linkHref);
                 if (linkText.contains("处罚") && matcher.find()){
                     flag = true;
-                    linkHref = linkHref.replace("./","http://sthjj.liaocheng.gov.cn/xxgk/wryhjjgxxgk/xzcf/");
+//                    TODO 不一定这么替换的
+                    String patternString = "^(.*)/[^/]+$";
+
+                    pattern = Pattern.compile(patternString);
+                    matcher = pattern.matcher(url);
+                    String str = "";
+                    if (matcher.find()) {
+                        str = matcher.group(1)+"/";
+                    }
+                    linkHref = linkHref.replace("./",str);
                     crawling(linkHref);
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+//            e.printStackTrace();
         }
         return flag;
     }
@@ -265,29 +286,62 @@ public class Crawler {
 
     private void deleteFile(String fileName) {
         File file = new File(fileName);
-        if (file.delete()) {
-            System.out.println(file.getName() + " 文件已被删除！");
-        } else {
-            System.out.println("文件删除失败！");
+        boolean flag = file.delete();
+        for (int i = 0; i < 5; i++) {
+            flag = file.delete();
+            if (flag = true)
+                break;
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+//                e.printStackTrace();
+            }
         }
+        if (flag)
+            System.out.println(file.getName() + " 文件已被删除！");
+        else
+            System.out.println("文件删除失败");
     }
 
     private String transferToString(String fileName) {
         if (fileName.contains(".pdf"))
             return resolvePdf();
+        else if (fileName.contains(".docx"))
+            return resolveDocx(fileName);
         else if (fileName.contains(".doc"))
             return resolveDoc(fileName);
-        else if (fileName.contains(".docx"))
-            return resolveDocx();
+        else if (fileName.contains(".xlsx"))
+            return resolveXlsx(fileName);
         else if (fileName.contains(".xls"))
             return resolveXls(fileName);
-        else if (fileName.contains(".xlsx"))
-            return resolveXlsx();
         else return "";
     }
 
-    private String resolveXlsx() {
-        return "";
+    private String resolveXlsx(String filePath) {
+        StringBuilder result = new StringBuilder();
+        try (FileInputStream fileInputStream = new FileInputStream(new File(filePath));
+            XSSFWorkbook workbook = new XSSFWorkbook(fileInputStream)) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (Row row: sheet) {
+                for (Cell cell : row) {
+                    if (cell.getCellType() == CellType.NUMERIC) {
+//                        System.out.println(cell.getNumericCellValue());
+                        result.append(cell.getNumericCellValue());
+                    } else if (cell.getCellType() == CellType.STRING) {
+//                        System.out.println(cell.getStringCellValue());
+                        result.append(cell.getStringCellValue());
+                    } else if (cell.getCellType() == CellType.BOOLEAN) {
+//                        System.out.println(cell.getBooleanCellValue());
+                        result.append(cell.getBooleanCellValue());
+                    }
+                }
+//                System.out.println();
+            }
+        } catch (IOException e) {
+//            e.printStackTrace();
+        }
+        return String.valueOf(result);
     }
 
     private String resolveXls(String filePath) {
@@ -315,13 +369,14 @@ public class Crawler {
                 for (int j = 0; j < row.getLastCellNum(); j++) {
                     Cell cell = row.getCell(j);
                     if (cell == null) break;
-                    if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)){
-                        // 处理日期
-                        Date date = sdf.parse(row.getCell(i).toString());
-                        row.getCell(i).setCellValue(date);
-                        row.getCell(i).setCellStyle(dateStyle);
-                        result.append(date.toString());
-                    } if (cell.getCellType() == CellType.NUMERIC) {
+//                    if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)){
+//                        // 处理日期
+//                        Date date = sdf.parse(row.getCell(i).toString());
+//                        row.getCell(i).setCellValue(date);
+//                        row.getCell(i).setCellStyle(dateStyle);
+//                        result.append(date.toString());
+//                    }
+                    if (cell.getCellType() == CellType.NUMERIC) {
 //                        System.out.println(cell.getNumericCellValue());
                         result.append(cell.getNumericCellValue());
                     } else if (cell.getCellType() == CellType.STRING) {
@@ -332,18 +387,25 @@ public class Crawler {
                         result.append(cell.getBooleanCellValue());
                     }
                 }
-                System.out.println();
             }
             workbook.close();
         }
-        catch (IOException | ParseException e) {
-            e.printStackTrace();
+        catch (Exception e) {
+//            e.printStackTrace();
         }
         return String.valueOf(result);
     }
 
-    private String resolveDocx() {
-        return "";
+    private String resolveDocx(String filePath) {
+        String text = "";
+        try (FileInputStream fileInputStream = new FileInputStream(new File(filePath));
+             XWPFDocument document = new XWPFDocument(fileInputStream);
+             XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
+             text = extractor.getText();
+        } catch (IOException e) {
+//            e.printStackTrace();
+        }
+        return text;
     }
 
     private String resolveDoc(String filePath) {
@@ -352,15 +414,14 @@ public class Crawler {
             HWPFDocument document = new HWPFDocument(fis);
             WordExtractor extractor = new WordExtractor(document);
             result.append(extractor.getText());
+        } catch (IOException e) {
+//            e.printStackTrace();
         }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-
         return result.toString();
     }
 
     private String resolvePdf() {
+
         return "";
     }
 
@@ -372,91 +433,98 @@ public class Crawler {
         return url.contains(".pdf") || url.contains(".doc") || url.contains(".docx") || url.contains(".xls") || url.contains(".xlsx");
     }
 
-
+//TODO 这里得优化
     private void createPojoAndPutListForHtml(String url){
         PunishObj punishObj = new PunishObj();
         Document document = null;
+//        是否出现处理不了的url
+        boolean flag = false;
         try {
             document = Jsoup.connect(url)
                     .userAgent("Mozilla")
 //                    .timeout(3000)
                     .get();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        assert document != null;
+        } catch (Exception e) {
+            flag = true;
+//            e.printStackTrace();
+        } finally {
+            if (!flag){
+                assert document != null;
 //                获取head的内容
-        Elements head = document.getElementsByTag("head");
-        Elements elements = head.first().getElementsByTag("meta");
-        for (Element element : elements) {
-            String name = element.attr("name");
-            String content = element.attr("content");;
-            if (name.equals("PubDate")){
-                punishObj.setDate(LocalDate.parse(content));
-            }if (name.equals("ArticleTitle")){
-                punishObj.setTitle(content);
-            }else if (name.equals("SiteName")){
-                punishObj.setInstitution(content);
-            }
-        }
-        punishObj.setProvince("山东省");
-        punishObj.setCity("聊城市");
-        punishObj.setUrl(url);
+                Elements head = document.getElementsByTag("head");
+                Elements elements = head.first().getElementsByTag("meta");
+                for (Element element : elements) {
+                    String name = element.attr("name");
+                    String content = element.attr("content");;
+                    if (name.equals("PubDate")){
+                        punishObj.setDate(content);
+                    }if (name.equals("ArticleTitle")){
+                        punishObj.setTitle(content);
+                    }else if (name.equals("SiteName")){
+                        punishObj.setInstitution(content);
+                    }
+                }
+                punishObj.setProvince("山东省");
+                punishObj.setCity("聊城市");
+                punishObj.setUrl(url);
 //       原因，内容，具体内容，金额
-        Elements contents = document.getElementsByClass("MsoNormal");
+                Elements contents = document.getElementsByClass("MsoNormal");
 //        title标题的一个括号里 聊环罚[2013]11号（高唐县人和街道社区卫生服务中心）-聊城市生态环境局
 
-        String str,regex;
-        str = punishObj.getTitle();
-        regex = "\\（(.*?)\\）";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(str);
-        while (matcher.find()) {
-            punishObj.setTarget(matcher.group(1));
-        }
-        //将html转化成纯文本，再进行正则匹配
-        str = document.text();
+                String str,regex;
+                str = punishObj.getTitle();
+                regex = "\\（(.*?)\\）";
+                Pattern pattern = Pattern.compile(regex);
+                Matcher matcher = pattern.matcher(str);
+                while (matcher.find()) {
+                    punishObj.setTarget(matcher.group(1));
+                }
+                //将html转化成纯文本，再进行正则匹配
+                str = document.text();
 //        构建提取处罚原因的正则表达式
-        String[] begins = {"发现你（单位）实施了以下环境违法行为","发现你公司实施了以下环境违法行为","你单位存在以下行为","你公司存在以下行为"};
-        String[] ends = {"以上事实","你公司以上行为违反了","上述行为违反了","上述事实，由以下证据证明"};
-        for (String begin : begins) {
-            for (String end : ends) {
-                regex = "(?<=" + begin + ").+?(?=" + end + ")";
-                pattern = Pattern.compile(regex);
-                matcher = pattern.matcher(str);
-                if (matcher.find()) {
-                    punishObj.setReason(matcher.group());
-                    break;
+                String[] begins = {"发现你（单位）实施了以下环境违法行为","发现你公司实施了以下环境违法行为","你单位存在以下行为","你公司存在以下行为"};
+                String[] ends = {"以上事实","你公司以上行为违反了","上述行为违反了","上述事实，由以下证据证明"};
+                for (String begin : begins) {
+                    for (String end : ends) {
+                        regex = "(?<=" + begin + ").+?(?=" + end + ")";
+                        pattern = Pattern.compile(regex);
+                        matcher = pattern.matcher(str);
+                        if (matcher.find()) {
+                            punishObj.setReason(matcher.group());
+                            break;
+                        }
+                    }
                 }
-            }
-        }
 //        构建处罚内容的正则表达式
-        begins = new String[]{"决定对你（单位）作出如下行政处罚", "决定对你单位作出如下行政处罚","我局对你（单位）实施以下行政处罚",
-                "我局对你（单位）作出如下行政处罚","我局决定对你(单位)处以如下行政处罚","我局拟对你（单位）处以行政罚款人民币",
-                "我局决定对你（单位）罚款", "我局决定对你公司处以如下行政处罚","我局决定对你公司作出如下行政处罚","现责令","我局决定","情节","对你公司作出如下处罚"};
-        ends = new String[]{"行政处罚决定的履行方式和期限","限于接到本处罚决定书之日起十五日内","处罚决定的履行方式和期限限于接到本处罚决定之日起15日内缴至指定银行和账号",
-                "并于接到本决定书之日起十五日内","限你（单位）自收到本处罚决定之日起十五日内","限于接到本处罚决定之日起十五日内持","你(单位)如不服本处罚决定",
-                "责令改正的履行以及未改正"};
-        for (String begin : begins) {
-            for (String end : ends) {
-                regex = "(?<=" + begin + ").+?(?=" + end + ")";
+                begins = new String[]{"决定对你（单位）作出如下行政处罚", "决定对你单位作出如下行政处罚","我局对你（单位）实施以下行政处罚",
+                        "我局对你（单位）作出如下行政处罚","我局决定对你(单位)处以如下行政处罚","我局拟对你（单位）处以行政罚款人民币",
+                        "我局决定对你（单位）罚款", "我局决定对你公司处以如下行政处罚","我局决定对你公司作出如下行政处罚","现责令","我局决定","情节","对你公司作出如下处罚"};
+                ends = new String[]{"行政处罚决定的履行方式和期限","限于接到本处罚决定书之日起十五日内","处罚决定的履行方式和期限限于接到本处罚决定之日起15日内缴至指定银行和账号",
+                        "并于接到本决定书之日起十五日内","限你（单位）自收到本处罚决定之日起十五日内","限于接到本处罚决定之日起十五日内持","你(单位)如不服本处罚决定",
+                        "责令改正的履行以及未改正"};
+                for (String begin : begins) {
+                    for (String end : ends) {
+                        regex = "(?<=" + begin + ").+?(?=" + end + ")";
+                        pattern = Pattern.compile(regex);
+                        matcher = pattern.matcher(str);
+                        if (matcher.find()) {
+                            punishObj.setContent(matcher.group());
+                            punishObj.setConcreteContent(matcher.group());
+                            break;
+                        }
+                    }
+                }
+//        构建处罚金额正则表达式
+                regex = "(?<=罚款).+?(?=元)";
                 pattern = Pattern.compile(regex);
                 matcher = pattern.matcher(str);
-                if (matcher.find()) {
-                    punishObj.setContent(matcher.group());
-                    punishObj.setConcreteContent(matcher.group());
-                    break;
+                if (matcher.find()){
+                    punishObj.setAmount(matcher.group());
                 }
+                punishObjList.add(punishObj);
             }
         }
-//        构建处罚金额正则表达式
-        regex = "(?<=罚款).+?(?=元)";
-        pattern = Pattern.compile(regex);
-        matcher = pattern.matcher(str);
-        if (matcher.find()){
-            punishObj.setAmount(matcher.group());
-        }
-        punishObjList.add(punishObj);
+
     }
 
 }

@@ -255,7 +255,7 @@ public class CrawlerMain {
             String name = element.attr("name");
             String content = element.attr("content");;
             if (name.equals("PubDate")){
-                punishObj.setDate(LocalDate.parse(content));
+                punishObj.setDate(content);
             }if (name.equals("ArticleTitle")){
                 punishObj.setTitle(content);
             }else if (name.equals("SiteName")){
